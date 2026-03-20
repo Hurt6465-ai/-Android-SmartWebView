@@ -1,0 +1,126 @@
+/* ============================================================
+   Smart WebView v8 - Custom App CSS
+   Author: Optimized for NotionNext + NodeBB
+   ============================================================ */
+
+/* ============================================================
+   1. 核心安全：全局封锁（禁选、禁长按菜单、禁图片拖拽）
+   ============================================================ */
+*, *::before, *::after {
+    -webkit-user-select: none !important; /* 禁止选中文字 */
+    user-select: none !important;
+    -webkit-touch-callout: none !important; /* 禁止长按菜单 */
+    -webkit-tap-highlight-color: rgba(0,0,0,0) !important; /* 点击无高亮 */
+    -webkit-user-drag: none !important; /* 禁止图片/链接拖拽 */
+}
+
+/* ============================================================
+   2. 交互例外：输入框、编辑区可选
+   ============================================================ */
+input, textarea, [contenteditable="true"], .editable {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important; /* 输入框内可长按粘贴 */
+}
+
+/* ============================================================
+   3. 原生点击反馈与微交互
+   ============================================================ */
+button, a, .action-button, .nav-item, [role="button"] {
+    transition: transform 0.1s ease, opacity 0.1s ease !important;
+    cursor: pointer;
+}
+button:active, a:active, .action-button:active {
+    transform: scale(0.96) !important;
+    opacity: 0.8 !important;
+}
+button:focus, a:focus, .action-button:focus {
+    outline: none !important; /* 去掉虚线 */
+}
+
+/* ============================================================
+   4. 滚动与布局优化
+   ============================================================ */
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-y: none; /* 禁用下拉回弹 */
+    -webkit-overflow-scrolling: touch; /* 平滑滚动 */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 隐藏滚动条 */
+::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+/* ============================================================
+   5. NodeBB & NotionNext 底部导航适配
+   ============================================================ */
+.bottom-nav, footer.fixed-bottom, .mobile-footer {
+    position: fixed !important;
+    bottom: 0 !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    z-index: 9999 !important;
+    background-color: rgba(255,255,255,0.95); /* 半透明磨砂 */
+    backdrop-filter: blur(10px);
+}
+
+/* 暗色模式底部导航 */
+body.dark-mode .bottom-nav, 
+body.dark-mode footer.fixed-bottom, 
+body.dark-mode .mobile-footer {
+    background-color: rgba(24,24,24,0.95);
+}
+
+/* ============================================================
+   6. 顶部冗余清理
+   ============================================================ */
+#header-menu {
+    box-shadow: none !important;
+    border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+/* ============================================================
+   7. 链接与外链优化
+   ============================================================ */
+a {
+    text-decoration: none;
+    outline: none;
+    pointer-events: auto; /* 可点击 */
+}
+
+/* 外链建议：强制在外部浏览器打开，避免手势切换卡顿 */
+a[target="_blank"] {
+    pointer-events: auto;
+}
+
+/* ============================================================
+   8. 可选内容选中（开启可选复制文章/帖子）
+   ============================================================ */
+/*
+.post-content, .article-body {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+}
+*/
+
+/* ============================================================
+   9. 视觉细节：按钮、导航、操作反馈
+   ============================================================ */
+.action-button, .plugin-button, .nav-item {
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+/* ============================================================
+   10. 伪原生 App：去掉滚动条、蓝色高亮、拖拽
+   ============================================================ */
+img, a {
+    -webkit-user-drag: none !important;
+    pointer-events: auto;
+}

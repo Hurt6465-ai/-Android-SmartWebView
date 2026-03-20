@@ -75,6 +75,8 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # --- 7. 输出访问地址 ---
+            # --- 7. 输出访问地址 ---
       - name: Show Pages URL
-        run: echo "部署成功！访问地址: ${{ steps.deployment.outputs.page_url }}"
+        run: |
+          echo "部署成功！访问地址: ${{ steps.deployment.outputs.page_url }}"
+

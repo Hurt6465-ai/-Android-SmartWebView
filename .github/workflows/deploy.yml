@@ -2,7 +2,7 @@ name: Deploy Hybrid Site
 
 on:
   push:
-    branches: ["master"]
+    branches: ["master"] # 如果你的主分支叫 main，请改为 main
   workflow_dispatch:
 
 permissions:
@@ -19,49 +19,62 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout
+      # --- 1. 下载仓库代码 ---
+      - name: Checkout repository
         uses: actions/checkout@v6
 
-      # --- 1. Build docmd (The Documentation) ---
-      - name: Setup Node
+      # --- 2. 设置 Node.js 环境 ---
+      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: 22
 
+      # --- 3. 安装并构建 docmd 文档 ---
       - name: Install and Build docmd
         working-directory: ./docmd
         run: |
           npm install
-          npm install -g @mgks/docmd
+          npm install -g @docmd/core --unsafe-perm
           docmd build
 
-      # --- 2. Merge Sites into One Folder ---
+      # --- 4. 合并主站和文档站点 ---
       - name: Assemble Final Site
         run: |
-          # Create a temporary folder for the final website
-          mkdir _final_build
-          
-          # A. Copy your EXISTING main site (from root docs/) to the root of the build
-          cp -r demo/* _final_build/
-          
-          # B. Create the subfolder for documentation
-          mkdir -p _final_build/documentation
-          
-          # C. Copy the docmd output into that subfolder
-          cp -r docmd/site/* _final_build/documentation/
+          FINAL_DIR=_final_build
+          mkdir -p $FINAL_DIR
 
-      # --- 3. Deploy ---
+          # A. 复制主站资源
+          if [ -d demo ]; then
+            cp -r demo/* $FINAL_DIR/
+          else
+            echo "Warning: demo directory not found! Skipping main site copy."
+          fi
+
+          # B. 创建文档子目录并复制文档内容
+          mkdir -p $FINAL_DIR/documentation
+          if [ -d docmd/site ]; then
+            cp -r docmd/site/* $FINAL_DIR/documentation/
+          else
+            echo "Error: docmd/site not found! Build might have failed."
+            exit 1
+          fi
+
+      # --- 5. 配置 GitHub Pages ---
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: ./_final_build # Upload the merged folder
+          path: ./_final_build
 
+      # --- 6. 部署到 GitHub Pages ---
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # --- 7. 输出访问地址 ---
+      - name: Show Pages URL
+        run: echo "部署成功！访问地址: ${{ steps.deployment.outputs.page_url }}"

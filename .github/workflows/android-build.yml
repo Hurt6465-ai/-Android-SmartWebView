@@ -34,9 +34,10 @@ jobs:
       - name: Grant Execute Permission
         run: chmod +x gradlew
 
-      # 5. 构建 Debug APK (增加 --no-daemon 模式防止环境冲突)
+            # 5. 清理并构建 (加入 clean 步骤非常关键)
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew clean assembleDebug --no-daemon --stacktrace --info
+
 
 
       # 6. 构建 Release 版本 APK (生成的通常是 unsigned 未签名版)

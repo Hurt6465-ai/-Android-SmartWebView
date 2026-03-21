@@ -981,54 +981,47 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
      * WebView client implementation
      */
     private class WebViewCallback extends WebViewClient {
-        @Override
-        public void onPageStarted(WebView view, String url, Bitmap favicon) {
-            super.onPageStarted(view, url, favicon);
-            SWVContext.getPluginManager().onPageStarted(url);
+    public class WebAppInterface {
 
-        }
-
-        @Override
-        public void onPageFinished(WebView view, String url) {
-            super.onPageFinished(view, url);
-
-            SWVContext.getPluginManager().onPageFinished(url);
-
-            findViewById(R.id.msw_welcome).setVisibility(View.GONE);
-            findViewById(R.id.msw_view).setVisibility(View.VISIBLE);
-            isPageLoaded = true;
-
-            // Inject Google Analytics if configured
-            if (!url.startsWith("file://") && SWVContext.ASWV_GTAG != null && !SWVContext.ASWV_GTAG.isEmpty()) {
-                fns.inject_gtag(view, SWVContext.ASWV_GTAG);
+    @JavascriptInterface
+    public void setNativeTheme(String theme) {
+        // 保留原本主题切换逻辑
+        runOnUiThread(() -> {
+            int newMode;
+            if ("dark".equals(theme)) {
+                newMode = AppCompatDelegate.MODE_NIGHT_YES;
+            } else if ("light".equals(theme)) {
+                newMode = AppCompatDelegate.MODE_NIGHT_NO;
+            } else {
+                newMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
             }
-
-            // Inject theme preference
-            String theme = SWVContext.ASWP_DARK_MODE ? "dark" : "light";
-            String script = "if(typeof applyInitialTheme === 'function') { applyInitialTheme('" + theme + "'); }";
-            view.evaluateJavascript(script, null);
-
-            if (SWVContext.ASWP_CUSTOM_CSS) {
-                try {
-                    InputStream inputStream = getAssets().open("web/custom.css");
-                    byte[] buffer = new byte[inputStream.available()];
-                    inputStream.read(buffer);
-                    inputStream.close();
-                    String encoded = Base64.encodeToString(buffer, Base64.NO_WRAP);
-                    String js = "javascript:(function() {" +
-                            "var parent = document.getElementsByTagName('head').item(0);" +
-                            "var style = document.createElement('style');" +
-                            "style.type = 'text/css';" +
-                            "style.innerHTML = window.atob('" + encoded + "');" +
-                            "parent.appendChild(style)" +
-                            "})()";
-                    view.loadUrl(js);
-                    Log.d(TAG, "Custom CSS injected.");
-                } catch (Exception e) {
-                    Log.e(TAG, "Failed to inject custom CSS.", e);
-                }
+            if (AppCompatDelegate.getDefaultNightMode() != newMode) {
+                AppCompatDelegate.setDefaultNightMode(newMode);
             }
-        }
+        });
+    }
+
+    // --- 这是真正实现 0秒无白屏秒切 的核心秘方 ---
+    @JavascriptInterface
+    public void switchTab(String tabName) {
+        runOnUiThread(() -> {
+            // 1. 隐藏所有 WebView
+            if (SWVContext.webStudy != null) SWVContext.webStudy.setVisibility(View.GONE);
+            if (SWVContext.webForum != null) SWVContext.webForum.setVisibility(View.GONE);
+            if (SWVContext.webMsg != null) SWVContext.webMsg.setVisibility(View.GONE);
+
+            // 2. 根据前端传来的 tabName 秒切显示
+            if ("study".equals(tabName) && SWVContext.webStudy != null) {
+                SWVContext.webStudy.setVisibility(View.VISIBLE);
+            } else if ("msg".equals(tabName) && SWVContext.webMsg != null) {
+                SWVContext.webMsg.setVisibility(View.VISIBLE);
+            } else if (SWVContext.webForum != null) {
+                // forum, recent, community 等等共用主论坛 WebView
+                SWVContext.webForum.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+    }
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {

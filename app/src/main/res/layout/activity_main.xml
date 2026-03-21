@@ -1,53 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout
-	xmlns:android="http://schemas.android.com/apk/res/android"
-	xmlns:app="http://schemas.android.com/apk/res-auto"
-	xmlns:tools="http://schemas.android.com/tools"
-	android:id="@+id/coordinator_layout"
-	android:layout_width="match_parent"
-	android:layout_height="match_parent"
-	android:background="?android:attr/colorBackground"
-	tools:context=".MainActivity">
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/coordinator_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
+    tools:context=".MainActivity">
 
-	<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-		android:id="@+id/pullfresh"
-		android:layout_width="match_parent"
-		android:layout_height="match_parent">
+    <!-- 下拉刷新 -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/pullfresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
-		<RelativeLayout
-			android:layout_width="match_parent"
-			android:layout_height="match_parent">
+        <FrameLayout
+            android:id="@+id/webview_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
-			<WebView
-				android:id="@+id/msw_view"
-				android:layout_width="match_parent"
-				android:layout_height="match_parent"
-				android:visibility="gone" />
+            <!-- 学习页 WebView -->
+            <WebView
+                android:id="@+id/webStudy"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="visible"/>
 
-			<WebView
-				android:id="@+id/print_view"
-				android:layout_width="0dp"
-				android:layout_height="0dp"
-				android:visibility="gone" />
+            <!-- 论坛页 WebView -->
+            <WebView
+                android:id="@+id/webForum"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone"/>
 
-			<include layout="@layout/welcome_splash" />
-			<include layout="@layout/security_overlay" />
-		</RelativeLayout>
-	</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            <!-- 消息页 WebView -->
+            <WebView
+                android:id="@+id/webMsg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone"/>
+        </FrameLayout>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-	<!-- Ad Container and Progress Bar -->
-	<LinearLayout
-		android:id="@+id/msw_ad_container"
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_gravity="bottom"
-		android:orientation="vertical"/>
-	<ProgressBar
-		android:id="@+id/msw_progress"
-		style="?android:attr/progressBarStyleHorizontal"
-		android:layout_width="match_parent"
-		android:layout_height="3dp"
-		android:layout_gravity="bottom"
-		android:progressDrawable="@drawable/progress_style"
-		android:visibility="visible" />
+    <!-- Ad Container -->
+    <LinearLayout
+        android:id="@+id/msw_ad_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"/>
+    
+    <!-- 顶部/底部进度条 -->
+    <ProgressBar
+        android:id="@+id/msw_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_gravity="bottom"
+        android:progressDrawable="@drawable/progress_style"
+        android:visibility="visible"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  Smart WebView v8
+  https://github.com/mgks/Android-SmartWebView
+-->
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:tools="http://schemas.android.com/tools"
 	package="mgks.os.swv">
@@ -11,31 +17,41 @@
 		android:normalScreens="true"
 		android:xlargeScreens="true" />
 
-	<!-- Essential Permissions -->
+	<!-- 核心网络与硬件权限 -->
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 	<uses-permission android:name="android.permission.VIBRATE" />
 	<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-	<!-- Permissions for Optional Features -->
+	<!-- 通知与媒体权限 -->
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<uses-permission android:name="android.permission.CAMERA" />
+	
+    <!-- 【关键新增】精准定位权限（语伴找人必须） -->
 	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-	
-	<!-- 【新增】后台静默定位与麦克风录音（AI 语音对练与语伴必须） -->
-	<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-	<uses-permission android:name="android.permission.RECORD_AUDIO" />
-	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    
+    <!-- 【关键新增】麦克风权限（AI 语音对练、发送语音消息必须） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-	<!-- Permissions for File Access -->
+	<!-- 现代 Android 文件读写权限 -->
 	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 	<uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 	<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 	<uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
-	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" tools:ignore="ScopedStorage" />
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+		android:maxSdkVersion="32" />
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+		android:maxSdkVersion="28"
+		tools:ignore="ScopedStorage" />
+
+	<!-- 声明所需的硬件特性 -->
+	<uses-feature android:name="android.hardware.location.gps" android:required="false" />
+	<uses-feature android:name="android.hardware.camera" android:required="false" />
+	<uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
 	<application
 		android:icon="@mipmap/ic_launcher"
@@ -51,33 +67,37 @@
 			android:resource="@xml/gma_ad_services_config"
 			tools:replace="android:resource" />
 
-		<!-- Main Activity -->
+		<!-- 主入口 Activity -->
 		<activity
 			android:name=".MainActivity"
 			android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|uiMode"
 			android:windowSoftInputMode="adjustResize"
 			android:theme="@style/Theme.SmartWebView"
 			android:exported="true">
+			
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
 			
-			<!-- 【修改】绑定你的专属域名 -->
+            <!-- 【深度绑定域名】让外部点击 886.best 的链接时，直接拉起你的 App -->
 			<intent-filter android:label="@string/app_name">
 				<action android:name="android.intent.action.VIEW" />
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
 				<data android:scheme="https" android:host="886.best" />
-				<data android:scheme="https" android:host="bbs.886.best" />
+                <data android:scheme="https" android:host="bbs.886.best" />
 			</intent-filter>
+			
 			<intent-filter android:label="OpenURI">
 				<action android:name="OPEN_URI" />
 				<category android:name="android.intent.category.DEFAULT" />
 			</intent-filter>
 		</activity>
 
-		<activity android:name=".ShareActivity" android:exported="true">
+		<!-- 分享功能 Activity -->
+		<activity android:name=".ShareActivity"
+			android:exported="true">
 			<intent-filter android:label="Share">
 				<action android:name="android.intent.action.SEND" />
 				<category android:name="android.intent.category.DEFAULT" />
@@ -88,14 +108,22 @@
 				<category android:name="android.intent.category.DEFAULT" />
 				<data android:mimeType="image/*" />
 			</intent-filter>
+			<intent-filter android:label="Share Multiple Images">
+				<action android:name="android.intent.action.SEND_MULTIPLE" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<data android:mimeType="image/*" />
+			</intent-filter>
 		</activity>
 
-		<service android:name=".Firebase" android:exported="false">
+		<!-- Firebase 推送服务 -->
+		<service android:name=".Firebase"
+			android:exported="false">
 			<intent-filter>
 				<action android:name="com.google.firebase.MESSAGING_EVENT" />
 			</intent-filter>
 		</service>
 
+		<!-- 文件提供者 (拍照/上传文件必须的组件，防闪退) -->
 		<provider
 			android:name="androidx.core.content.FileProvider"
 			android:authorities="${applicationId}.provider"
@@ -106,7 +134,13 @@
 				android:resource="@xml/provider_paths" />
 		</provider>
 
-		<meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version" />
-		<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="@string/admob_app_id"/>
+		<!-- Google 服务与广告 ID -->
+		<meta-data
+			android:name="com.google.android.gms.version"
+			android:value="@integer/google_play_services_version" />
+		<meta-data
+			android:name="com.google.android.gms.ads.APPLICATION_ID"
+			android:value="@string/admob_app_id"/>
+
 	</application>
 </manifest>

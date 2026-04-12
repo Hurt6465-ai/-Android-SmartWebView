@@ -7,19 +7,18 @@ package mgks.os.swv;
   A modern, open-source WebView wrapper for building advanced hybrid Android apps.
   Native features, modular plugins, and full customisation—built for developers.
 
-  - Documentation: https://mgks.github.io/Android-SmartWebView/documentation  
-  - Plugins: https://mgks.github.io/Android-SmartWebView/documentation/plugins  
-  - Discussions: https://github.com/mgks/Android-SmartWebView/discussions  
-  - Sponsor the Project: https://github.com/sponsors/mgks  
+  - Documentation: https://mgks.github.io/Android-SmartWebView/documentation
+  - Plugins: https://mgks.github.io/Android-SmartWebView/documentation/plugins
+  - Discussions: https://github.com/mgks/Android-SmartWebView/discussions
+  - Sponsor the Project: https://github.com/sponsors/mgks
 
-  MIT License — https://opensource.org/licenses/MIT  
+  MIT License — https://opensource.org/licenses/MIT
 
   Mentioning Smart WebView in your project helps others find it and keeps the dev loop alive.
 */
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.DownloadManager;
@@ -46,7 +45,6 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
@@ -54,7 +52,6 @@ import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
-import android.webkit.PermissionRequest;
 import android.webkit.ServiceWorkerClient;
 import android.webkit.ServiceWorkerController;
 import android.webkit.SslErrorHandler;
@@ -79,9 +76,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.SwitchCompat;
-import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.GravityCompat;
@@ -92,10 +87,10 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
 
 import com.journeyapps.barcodescanner.ScanContract;
-import com.journeyapps.barcodescanner.ScanIntentResult;
 import com.journeyapps.barcodescanner.ScanOptions;
 
 import java.io.InputStream;
@@ -110,10 +105,10 @@ import mgks.os.swv.plugins.QRScannerPlugin;
  * Handles WebView configuration, lifecycle events and user interactions
  */
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
-    // Class members
     private static final String TAG = "MainActivity";
 
     private boolean isPageLoaded = false;
+    private boolean singleWebViewMode = false;
 
     static Functions fns = new Functions();
     private FileProcessing fileProcessing;
@@ -122,65 +117,59 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private ActivityResultLauncher<Intent> fileUploadLauncher;
     private ActivityResultLauncher<ScanOptions> qrScannerLauncher;
 
+    private SwipeRefreshLayout pullRefresh;
+    private BottomNavigationView bottomNav;
+
+    private WebView webChat;
+    private WebView webLearn;
+    private WebView webTransient;
+    private WebView activeWebView;
+
+    private boolean chatLoaded = false;
+    private boolean learnLoaded = false;
+
+    private static final String URL_CHAT = "https://bbs.886.best/chats";
+    private static final String URL_PARTNERS = "https://bbs.886.best/partners";
+    private static final String URL_COMMUNITY = "https://bbs.886.best/categories";
+    private static final String URL_FEED = "https://bbs.886.best/category/6/%E9%97%B2%E8%81%8A";
+    private static final String URL_LEARN = "https://886.best/";
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
         SWVContext.getPluginManager().onActivityResult(requestCode, resultCode, intent);
     }
 
-    @SuppressLint({"SetJavaScriptEnabled", "WrongViewCast", "JavascriptInterface", "ClickableViewAccessibility"})
+    @SuppressLint({"SetJavaScriptEnabled", "WrongViewCast", "JavascriptInterface"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 【定制修改】强制防截屏和录屏，无视配置直接锁死
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
-      
+        if (SWVContext.ASWP_BLOCK_SCREENSHOTS) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        }
+
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (SWVContext.ASWP_EXIT_ON_BACK) {
-                    if (SWVContext.ASWP_EXITDIAL) {
-                        fns.ask_exit(MainActivity.this);
-                    } else {
-                        finish();
-                    }
-                    return;
-                }
-
-                if (SWVContext.asw_view.canGoBack()) {
-                    SWVContext.asw_view.goBack();
-                } else {
-                    if (SWVContext.ASWP_EXITDIAL) {
-                        fns.ask_exit(MainActivity.this);
-                    } else {
-                        finish();
-                    }
-                }
+                handleBackAction();
             }
         });
 
-        // Enable edge-to-edge display
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         super.onCreate(savedInstanceState);
 
-        // Handle splash screen
         final SplashScreen splashScreen = androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
 
-        // If extending splash is enabled, set up a listener
-        // Keep the splash screen on-screen if the extend feature is enabled
         final View content = findViewById(android.R.id.content);
         if (SWVContext.ASWP_EXTEND_SPLASH) {
             content.getViewTreeObserver().addOnPreDrawListener(
                 new ViewTreeObserver.OnPreDrawListener() {
                     @Override
                     public boolean onPreDraw() {
-                        // Check if the page is loaded.
                         if (isPageLoaded) {
-                            // The content is ready; remove the listener and draw the content.
                             content.getViewTreeObserver().removeOnPreDrawListener(this);
                             return true;
                         } else {
-                            // The content is not ready; don't draw anything, keeping the splash screen visible.
                             return false;
                         }
                     }
@@ -190,45 +179,38 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         permissionManager = new PermissionManager(this);
 
-        // Initialize the ActivityResultLauncher here, before it's needed
         fileUploadLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 Uri[] results = null;
                 if (result.getResultCode() == Activity.RESULT_CANCELED) {
-                    // If the file request was cancelled, we must send a null value
                     if (SWVContext.asw_file_path != null) {
                         SWVContext.asw_file_path.onReceiveValue(null);
-                        SWVContext.asw_file_path = null; // Clear path after use
+                        SWVContext.asw_file_path = null;
                     }
                     return;
                 }
 
                 if (result.getResultCode() == Activity.RESULT_OK) {
-                    if (null == SWVContext.asw_file_path) {
+                    if (SWVContext.asw_file_path == null) {
                         return;
                     }
 
                     Intent data = result.getData();
 
-                    // Scenario 1: User selected files from the gallery/file manager
                     if (data != null && (data.getDataString() != null || data.getClipData() != null)) {
                         ClipData clipData = data.getClipData();
                         if (clipData != null) {
-                            // Multiple files selected
                             final int numSelectedFiles = clipData.getItemCount();
                             results = new Uri[numSelectedFiles];
                             for (int i = 0; i < numSelectedFiles; i++) {
                                 results[i] = clipData.getItemAt(i).getUri();
                             }
                         } else if (data.getDataString() != null) {
-                            // Single file selected
                             results = new Uri[]{Uri.parse(data.getDataString())};
                         }
                     }
 
-                    // Scenario 2: User took a photo or video using the camera intent
-                    // If results is still null, check if a camera file path was set before launching the intent
                     if (results == null) {
                         if (SWVContext.asw_pcam_message != null) {
                             results = new Uri[]{Uri.parse(SWVContext.asw_pcam_message)};
@@ -238,26 +220,23 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     }
                 }
 
-                // Send the results back to the WebView
                 if (SWVContext.asw_file_path != null) {
                     SWVContext.asw_file_path.onReceiveValue(results);
                     SWVContext.asw_file_path = null;
                 }
 
-                // Clear camera messages after use
                 SWVContext.asw_pcam_message = null;
                 SWVContext.asw_vcam_message = null;
             }
         );
 
         qrScannerLauncher = registerForActivityResult(new ScanContract(),
-                result -> {
-                    // The result is already a ScanIntentResult, no parsing needed
-                    PluginInterface plugin = SWVContext.getPluginManager().getPluginInstance("QRScannerPlugin");
-                    if (plugin instanceof QRScannerPlugin) {
-                        ((QRScannerPlugin) plugin).handleScanResult(result);
-                    }
+            result -> {
+                PluginInterface plugin = SWVContext.getPluginManager().getPluginInstance("QRScannerPlugin");
+                if (plugin instanceof QRScannerPlugin) {
+                    ((QRScannerPlugin) plugin).handleScanResult(result);
                 }
+            }
         );
 
         SWVContext.setAppContext(getApplicationContext());
@@ -270,57 +249,46 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         initializeWebView();
 
         SWVContext.loadPlugins(this);
-        SWVContext.init(this, SWVContext.asw_view, fns); // This initializes the PluginManager and all queued plugins
+        SWVContext.init(this, SWVContext.asw_view, fns);
 
         PluginInterface qrPlugin = SWVContext.getPluginManager().getPluginInstance("QRScannerPlugin");
         if (qrPlugin instanceof QRScannerPlugin) {
             ((QRScannerPlugin) qrPlugin).setLauncher(qrScannerLauncher);
         }
 
-        // Setup features and handle intents now that plugins are ready
         if (savedInstanceState == null) {
             setupFeatures();
             handleIncomingIntents();
         }
 
-        // Debug mode logging
-        if(SWVContext.SWV_DEBUGMODE){
-            Log.d(TAG, "URL: "+ SWVContext.CURR_URL+"DEVICE INFO: "+ Arrays.toString(fns.get_info(this)));
+        if (SWVContext.SWV_DEBUGMODE) {
+            Log.d(TAG, "URL: " + SWVContext.CURR_URL + " DEVICE INFO: " + Arrays.toString(fns.get_info(this)));
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(content, (v, windowInsets) -> {
-            // Get the insets for the system bars (status bar, navigation bar)
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-
-            // Apply the insets as padding to the root view.
-            // This pushes the entire layout down from the status bar and up from the nav bar.
             v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-
-            // Return the insets so that other views can also process them if needed.
             return windowInsets;
         });
     }
 
-    /**
-     * Toggles the FLAG_SECURE on the window. Plugins can call this to temporarily
-     * enhance security. This method respects the global security.block.screenshots setting.
-     * @param secure true to add the secure flag, false to attempt to remove it.
-     */
     public void setWindowSecure(boolean secure) {
         runOnUiThread(() -> {
-            // 【定制修改】无论如何，强制保持安全锁，忽略解锁请求
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            if (secure) {
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            } else if (!SWVContext.ASWP_BLOCK_SCREENSHOTS) {
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            }
         });
     }
 
-    /**
-     * Setup the UI layout based on configuration
-     */
     private void setupLayout() {
         if (SWVContext.ASWV_LAYOUT == 1) {
+            singleWebViewMode = true;
             setContentView(R.layout.drawer_main);
-            MaterialToolbar toolbar = findViewById(R.id.toolbar); // Use MaterialToolbar
-            final SwipeRefreshLayout pullRefresh = findViewById(R.id.pullfresh);
+
+            MaterialToolbar toolbar = findViewById(R.id.toolbar);
+            pullRefresh = findViewById(R.id.pullfresh);
 
             if (SWVContext.ASWP_DRAWER_HEADER) {
                 findViewById(R.id.app_bar).setVisibility(View.VISIBLE);
@@ -340,9 +308,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     @Override
                     public void onDrawerClosed(View drawerView) {
                         super.onDrawerClosed(drawerView);
-                        if (pullRefresh != null && !pullRefresh.isEnabled() && SWVContext.ASWP_PULLFRESH) {
-                            pullRefresh.setEnabled(true);
-                        }
+                        updatePullRefreshState();
                     }
                 };
                 drawer.addDrawerListener(toggle);
@@ -354,47 +320,51 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             NavigationView navigationView = findViewById(R.id.nav_view);
             navigationView.setNavigationItemSelectedListener(this);
 
-            /*
-            // Temporarily disabled theme toggle logic
-            MenuItem switchItem = navigationView.getMenu().findItem(R.id.nav_dark_mode_switch);
-            SwitchCompat themeSwitch = (SwitchCompat) Objects.requireNonNull(switchItem.getActionView()).findViewById(R.id.drawer_theme_switch);
-            if (themeSwitch != null) {
-                int currentNightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-                themeSwitch.setChecked(currentNightMode == Configuration.UI_MODE_NIGHT_YES);
-                themeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                    AppCompatDelegate.setDefaultNightMode(
-                            isChecked ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO
-                    );
-                    recreate();
-                });
-            }
-            */
-
+            activeWebView = findViewById(R.id.msw_view);
+            SWVContext.asw_view = activeWebView;
         } else {
+            singleWebViewMode = false;
             setContentView(R.layout.activity_main);
+
+            pullRefresh = findViewById(R.id.pullfresh);
+            webChat = findViewById(R.id.web_chat);
+            webLearn = findViewById(R.id.web_learn);
+            webTransient = findViewById(R.id.web_transient);
+            bottomNav = findViewById(R.id.bottom_nav);
+
+            activeWebView = webChat;
+            SWVContext.asw_view = webChat;
         }
 
-        SWVContext.asw_view = findViewById(R.id.msw_view);
         adContainer = findViewById(R.id.msw_ad_container);
         SWVContext.print_view = findViewById(R.id.print_view);
     }
 
-    /**
-     * Initialize WebView and its settings
-     */
-    @SuppressLint("ClickableViewAccessibility")
     private void initializeWebView() {
-        // Initialize Smart WebView with current context. This will set up the PluginManager.
-        SWVContext.init(this, SWVContext.asw_view, fns);
+        if (singleWebViewMode) {
+            setupOneWebView(activeWebView);
+            SWVContext.init(this, activeWebView, fns);
+            Playground playground = new Playground(this, activeWebView, fns);
+            SWVContext.getPluginManager().setPlayground(playground);
+            return;
+        }
 
-        // Instantiate Playground and register it with the manager
-        Playground playground = new Playground(this, SWVContext.asw_view, fns);
+        setupOneWebView(webChat);
+        setupOneWebView(webLearn);
+        setupOneWebView(webTransient);
+
+        SWVContext.init(this, activeWebView, fns);
+        Playground playground = new Playground(this, activeWebView, fns);
         SWVContext.getPluginManager().setPlayground(playground);
 
-        // Configure WebView settings
-        WebSettings webSettings = SWVContext.asw_view.getSettings();
+        setupBottomNav();
+    }
 
-        // Configure user agent
+    private void setupOneWebView(WebView webView) {
+        if (webView == null) return;
+
+        WebSettings webSettings = webView.getSettings();
+
         if (SWVContext.OVERRIDE_USER_AGENT || SWVContext.POSTFIX_USER_AGENT) {
             String userAgent = webSettings.getUserAgentString();
             if (SWVContext.OVERRIDE_USER_AGENT) {
@@ -406,18 +376,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             webSettings.setUserAgentString(userAgent);
         }
 
-        // Configure WebView settings
-        // WARNING: setJavaScriptEnabled can introduce XSS vulnerabilities.
-        // Ensure you are loading only trusted content (your own website) and
-        // that you have sanitized any user-submitted content on your server.
         webSettings.setJavaScriptEnabled(true);
         webSettings.setSaveFormData(SWVContext.ASWP_SFORM);
-        
-        // 【定制修改】彻底禁用缩放，防止网页被随意放大缩小
         webSettings.setSupportZoom(false);
         webSettings.setBuiltInZoomControls(false);
         webSettings.setDisplayZoomControls(false);
-        
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowFileAccessFromFileURLs(true);
         webSettings.setAllowUniversalAccessFromFileURLs(true);
@@ -425,76 +388,41 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         webSettings.setDomStorageEnabled(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-        // Allow third-party cookies for captcha, social logins, etc.
-        // 【定制修改】强制启用 Cookie 跨域同步，保证学习站与语伴站登录无缝互通
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            cookieManager.setAcceptThirdPartyCookies(SWVContext.asw_view, true);
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
         }
 
-        // Disable copy-paste if configured
         if (!SWVContext.ASWP_COPYPASTE) {
-            SWVContext.asw_view.setOnLongClickListener(v -> true);
+            webView.setOnLongClickListener(v -> true);
         }
 
-        // Set WebView properties
-        SWVContext.asw_view.setHapticFeedbackEnabled(false);
-        SWVContext.asw_view.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        SWVContext.asw_view.setVerticalScrollBarEnabled(false);
+        webView.setHapticFeedbackEnabled(false);
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        webView.setVerticalScrollBarEnabled(false);
 
-        // Set WebView clients
-        SWVContext.asw_view.setWebViewClient(new WebViewCallback());
-        SWVContext.asw_view.setWebChromeClient(createWebChromeClient());
-        SWVContext.asw_view.setBackgroundColor(getColor(R.color.colorPrimary));
-        SWVContext.asw_view.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
+        webView.setWebViewClient(new WebViewCallback());
+        webView.setWebChromeClient(createWebChromeClient());
+        webView.setBackgroundColor(getColor(R.color.colorPrimary));
+        webView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
 
-        // 【定制修改】智能手势控制：拦截系统滑动返回，右向左滑执行内部返回，左向右滑交给前端（拉抽屉）
-        SWVContext.asw_view.setOnTouchListener(new View.OnTouchListener() {
-            private float startX;
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        startX = event.getX();
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        float endX = event.getX();
-                        float deltaX = endX - startX;
-                        // 滑动距离超过 100 像素判断为有效手势
-                        if (Math.abs(deltaX) > 100) {
-                            if (deltaX < 0) { // Right to Left (右滑至左)
-                                if (SWVContext.asw_view.canGoBack()) {
-                                    SWVContext.asw_view.goBack();
-                                    return true; // 消费拦截此事件
-                                }
-                            } else if (deltaX > 0) { // Left to Right (左滑至右)
-                                return false; // 故意放行，交给前端网页去触发抽屉
-                            }
-                        }
-                        break;
-                }
-                return false; // 默认放行其他普通点击和滚动
-            }
-        });
-
-        // Setup download listener
-        setupDownloadListener();
+        setupDownloadListener(webView);
     }
 
-    /**
-     * Setup the download listener for WebView
-     */
-    private void setupDownloadListener() {
-        SWVContext.asw_view.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
-            // We only need storage permission for downloads on older Android versions.
-            // On modern Android, DownloadManager handles it. But a check is still good practice.
+    private void setupDownloadListener(WebView webView) {
+        if (webView == null) return;
+
+        webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             if (!permissionManager.isStoragePermissionGranted()) {
-                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, PermissionManager.STORAGE_REQUEST_CODE);
+                ActivityCompat.requestPermissions(
+                    MainActivity.this,
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    PermissionManager.STORAGE_REQUEST_CODE
+                );
                 Toast.makeText(this, "Storage permission is required to download files.", Toast.LENGTH_LONG).show();
             } else {
                 DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-
                 request.setMimeType(mimeType);
                 String cookies = CookieManager.getInstance().getCookie(url);
                 request.addRequestHeader("cookie", cookies);
@@ -503,27 +431,27 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimeType));
                 request.allowScanningByMediaScanner();
                 request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,
-                        URLUtil.guessFileName(url, contentDisposition, mimeType));
+                request.setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS,
+                    URLUtil.guessFileName(url, contentDisposition, mimeType)
+                );
 
                 DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-                assert dm != null;
-                dm.enqueue(request);
-                Toast.makeText(this, getString(R.string.dl_downloading2), Toast.LENGTH_LONG).show();
+                if (dm != null) {
+                    dm.enqueue(request);
+                    Toast.makeText(this, getString(R.string.dl_downloading2), Toast.LENGTH_LONG).show();
+                }
             }
         });
     }
 
-    /**
-     * Create the WebChromeClient for WebView
-     */
     private WebChromeClient createWebChromeClient() {
         return new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
-                if(SWVContext.SWV_DEBUGMODE) {
+                if (SWVContext.SWV_DEBUGMODE) {
                     Log.d("SWV_JS", consoleMessage.message() + " -- From line " +
-                            consoleMessage.lineNumber() + " of " + consoleMessage.sourceId());
+                        consoleMessage.lineNumber() + " of " + consoleMessage.sourceId());
                 }
                 return true;
             }
@@ -537,7 +465,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             @Override
             public void onProgressChanged(WebView view, int p) {
                 if (SWVContext.ASWP_PBAR) {
-                    if (SWVContext.asw_progress == null) SWVContext.asw_progress = findViewById(R.id.msw_progress);
+                    if (SWVContext.asw_progress == null) {
+                        SWVContext.asw_progress = findViewById(R.id.msw_progress);
+                    }
                     SWVContext.asw_progress.setProgress(p);
                     if (p == 100) {
                         SWVContext.asw_progress.setProgress(0);
@@ -547,24 +477,191 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                // 【定制修改】不再弹窗打扰用户，语伴地图直接静默获取定位授权
-                callback.invoke(origin, true, false);
-            }
-
-            // 【定制修改】自动静默授权硬件权限（如麦克风与摄像头，供 AI 对练录音使用）
-            @Override
-            @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-            public void onPermissionRequest(final PermissionRequest request) {
-                runOnUiThread(() -> request.grant(request.getResources()));
+                if (permissionManager.isLocationPermissionGranted()) {
+                    callback.invoke(origin, true, false);
+                } else {
+                    permissionManager.requestInitialPermissions();
+                }
             }
         };
     }
 
-    /**
-     * Setup various features based on configuration
-     */
+    private void setupBottomNav() {
+        if (bottomNav == null) return;
+
+        bottomNav.setOnItemSelectedListener(item -> {
+            int id = item.getItemId();
+
+            if (id == R.id.nav_chat) {
+                openChatTab();
+                return true;
+            } else if (id == R.id.nav_partner) {
+                openTransientTab(URL_PARTNERS, false);
+                return true;
+            } else if (id == R.id.nav_community) {
+                openTransientTab(URL_COMMUNITY, false);
+                return true;
+            } else if (id == R.id.nav_feed) {
+                openTransientTab(URL_FEED, false);
+                return true;
+            } else if (id == R.id.nav_learn) {
+                openLearnTab();
+                return true;
+            }
+            return false;
+        });
+
+        bottomNav.setSelectedItemId(R.id.nav_chat);
+    }
+
+    private void showOnly(WebView target) {
+        if (singleWebViewMode || target == null) return;
+
+        if (webChat != null) webChat.setVisibility(target == webChat ? View.VISIBLE : View.GONE);
+        if (webLearn != null) webLearn.setVisibility(target == webLearn ? View.VISIBLE : View.GONE);
+        if (webTransient != null) webTransient.setVisibility(target == webTransient ? View.VISIBLE : View.GONE);
+
+        activeWebView = target;
+        SWVContext.asw_view = target;
+        updatePullRefreshState();
+    }
+
+    private void openChatTab() {
+        if (singleWebViewMode) {
+            fns.aswm_view(URL_CHAT, false, SWVContext.asw_error_counter, this);
+            return;
+        }
+
+        showOnly(webChat);
+        if (!chatLoaded || webChat.getUrl() == null) {
+            webChat.loadUrl(URL_CHAT);
+            chatLoaded = true;
+        }
+        setBottomChecked(R.id.nav_chat);
+    }
+
+    private void openLearnTab() {
+        if (singleWebViewMode) {
+            fns.aswm_view(URL_LEARN, false, SWVContext.asw_error_counter, this);
+            return;
+        }
+
+        showOnly(webLearn);
+        if (!learnLoaded || webLearn.getUrl() == null) {
+            webLearn.loadUrl(URL_LEARN);
+            learnLoaded = true;
+        }
+        setBottomChecked(R.id.nav_learn);
+    }
+
+    private void openTransientTab(String url, boolean forceReload) {
+        if (singleWebViewMode) {
+            fns.aswm_view(url, false, SWVContext.asw_error_counter, this);
+            return;
+        }
+
+        showOnly(webTransient);
+        String currentUrl = webTransient.getUrl();
+        if (forceReload || currentUrl == null || !currentUrl.equals(url)) {
+            webTransient.loadUrl(url);
+        }
+
+        if (isPartnerUrl(url)) {
+            setBottomChecked(R.id.nav_partner);
+        } else if (isCommunityUrl(url)) {
+            setBottomChecked(R.id.nav_community);
+        } else if (isFeedUrl(url)) {
+            setBottomChecked(R.id.nav_feed);
+        }
+    }
+
+    private void setBottomChecked(int itemId) {
+        if (bottomNav == null) return;
+        MenuItem item = bottomNav.getMenu().findItem(itemId);
+        if (item != null) {
+            item.setChecked(true);
+        }
+    }
+
+    private boolean isChatUrl(String url) {
+        return url != null && url.startsWith("https://bbs.886.best/chats");
+    }
+
+    private boolean isPartnerUrl(String url) {
+        return url != null && url.startsWith("https://bbs.886.best/partners");
+    }
+
+    private boolean isCommunityUrl(String url) {
+        return url != null && url.startsWith("https://bbs.886.best/categories");
+    }
+
+    private boolean isFeedUrl(String url) {
+        return url != null && url.startsWith("https://bbs.886.best/category/6");
+    }
+
+    private boolean isLearnUrl(String url) {
+        return url != null && url.startsWith("https://886.best");
+    }
+
+    private void routeUrlToTab(String url, boolean forceReload) {
+        if (url == null || url.isEmpty()) {
+            openChatTab();
+            return;
+        }
+
+        if (singleWebViewMode) {
+            fns.aswm_view(url, false, SWVContext.asw_error_counter, this);
+            return;
+        }
+
+        if (isChatUrl(url)) {
+            showOnly(webChat);
+            if (forceReload || webChat.getUrl() == null || !webChat.getUrl().equals(url)) {
+                webChat.loadUrl(url);
+            }
+            chatLoaded = true;
+            setBottomChecked(R.id.nav_chat);
+        } else if (isLearnUrl(url)) {
+            showOnly(webLearn);
+            if (forceReload || webLearn.getUrl() == null || !webLearn.getUrl().equals(url)) {
+                webLearn.loadUrl(url);
+            }
+            learnLoaded = true;
+            setBottomChecked(R.id.nav_learn);
+        } else {
+            openTransientTab(url, forceReload);
+        }
+    }
+
+    private boolean handleBackAction() {
+        if (SWVContext.ASWP_EXIT_ON_BACK) {
+            if (SWVContext.ASWP_EXITDIAL) {
+                fns.ask_exit(this);
+            } else {
+                finish();
+            }
+            return true;
+        }
+
+        if (activeWebView != null && activeWebView.canGoBack()) {
+            activeWebView.goBack();
+            return true;
+        }
+
+        if (!singleWebViewMode && bottomNav != null && bottomNav.getSelectedItemId() != R.id.nav_chat) {
+            bottomNav.setSelectedItemId(R.id.nav_chat);
+            return true;
+        }
+
+        if (SWVContext.ASWP_EXITDIAL) {
+            fns.ask_exit(this);
+        } else {
+            finish();
+        }
+        return true;
+    }
+
     private void setupFeatures() {
-        // Setup service worker if supported
         ServiceWorkerController.getInstance().setServiceWorkerClient(new ServiceWorkerClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebResourceRequest request) {
@@ -572,72 +669,64 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         });
 
-        // Prevent app from being started again when it is still alive in the background
         if (!isTaskRoot()) {
             finish();
             return;
         }
 
-        // Initialize notification channel on Android 8+
         setupNotificationChannel();
-
-        // Setup swipe refresh functionality
         setupSwipeRefresh();
 
-        // Setup progress bar if enabled
         if (SWVContext.ASWP_PBAR) {
             SWVContext.asw_progress = findViewById(R.id.msw_progress);
         } else {
-            findViewById(R.id.msw_progress).setVisibility(View.GONE);
+            View progressView = findViewById(R.id.msw_progress);
+            if (progressView != null) {
+                progressView.setVisibility(View.GONE);
+            }
         }
         SWVContext.asw_loading_text = findViewById(R.id.msw_loading_text);
 
-        // Log device info and handle location permissions
         fns.get_info(this);
 
-        // A Centralized Permission Request on Launch
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             permissionManager.requestInitialPermissions();
         }, 1500);
 
-        // Get FCM token for notifications
         setupFirebaseMessaging();
     }
 
-    // Options menu for drawer theme
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
         final SearchView searchView = (SearchView) menu.findItem(R.id.menu_search).getActionView();
         if (searchView != null) {
             searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
-        }
-        if (searchView != null) {
             searchView.setQueryHint(getString(R.string.search_hint));
+            searchView.setIconified(true);
+            searchView.setIconifiedByDefault(true);
+            searchView.clearFocus();
+
+            searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                public boolean onQueryTextSubmit(String query) {
+                    searchView.clearFocus();
+                    if (singleWebViewMode) {
+                        fns.aswm_view(SWVContext.ASWV_SEARCH + query, false, SWVContext.asw_error_counter, MainActivity.this);
+                    } else {
+                        openTransientTab(SWVContext.ASWV_SEARCH + query, true);
+                    }
+                    searchView.setQuery(query, false);
+                    return false;
+                }
+
+                public boolean onQueryTextChange(String query) {
+                    return false;
+                }
+            });
         }
-        assert searchView != null;
-        searchView.setIconified(true);
-        searchView.setIconifiedByDefault(true);
-        searchView.clearFocus();
-
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            public boolean onQueryTextSubmit(String query) {
-                searchView.clearFocus();
-                fns.aswm_view(SWVContext.ASWV_SEARCH + query, false, SWVContext.asw_error_counter, MainActivity.this);
-                searchView.setQuery(query, false);
-                return false;
-            }
-
-            public boolean onQueryTextChange(String query) {
-                return false;
-            }
-        });
-        //searchView.setQuery(SmartWebView.asw_view.getUrl(),false);
         return true;
     }
 
-    // Options trigger for drawer theme
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         if (id == R.id.action_exit) {
@@ -647,22 +736,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return super.onOptionsItemSelected(item);
     }
 
-    /**
-     * Navigation menu item setup, config in SWVContext.java
-     */
-
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-
-        // Look up the configuration for the clicked item
         SWVContext.NavItem navItem = SWVContext.ASWV_DRAWER_MENU.get(id);
 
         if (navItem != null) {
             String action = navItem.action;
 
             if (action.startsWith("mailto:")) {
-                // Handle special mailto action
                 Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse(action));
                 try {
                     startActivity(Intent.createChooser(intent, "Send Email"));
@@ -670,15 +752,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     Toast.makeText(this, "No email app found.", Toast.LENGTH_SHORT).show();
                 }
             } else {
-                // Handle standard URL action
-                fns.aswm_view(action, false, 0, this);
+                if (singleWebViewMode) {
+                    fns.aswm_view(action, false, 0, this);
+                } else {
+                    routeUrlToTab(action, true);
+                }
             }
         } else {
-            // Optional: Log if a menu item is clicked but not configured
             Log.w(TAG, "No action configured for menu item ID: " + id);
         }
 
-        // Close the drawer
         if (SWVContext.ASWV_LAYOUT == 1) {
             DrawerLayout drawer = findViewById(R.id.drawer_layout);
             if (drawer != null) {
@@ -688,18 +771,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return true;
     }
 
-    /**
-     * Setup notification channel for Android Oreo and above
-     */
     private void setupNotificationChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager notificationManager =
-                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
             NotificationChannel channel = new NotificationChannel(
-                    SWVContext.asw_fcm_channel,
-                    getString(R.string.notification_channel_name),
-                    NotificationManager.IMPORTANCE_HIGH);
+                SWVContext.asw_fcm_channel,
+                getString(R.string.notification_channel_name),
+                NotificationManager.IMPORTANCE_HIGH);
 
             channel.setDescription(getString(R.string.notification_channel_desc));
             channel.setLightColor(Color.RED);
@@ -712,48 +792,60 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    /**
-     * Setup swipe refresh functionality
-     */
     private void setupSwipeRefresh() {
-        final SwipeRefreshLayout pullRefresh = findViewById(R.id.pullfresh);
+        if (pullRefresh == null) return;
 
         if (SWVContext.ASWP_PULLFRESH) {
             pullRefresh.setOnRefreshListener(() -> {
-                // Pass the current activity context to the pull_fresh method
-                fns.pull_fresh(MainActivity.this);
+                if (activeWebView != null) {
+                    activeWebView.reload();
+                }
                 pullRefresh.setRefreshing(false);
             });
 
-            // 【定制修改】学习页（886.best）彻底禁用下拉，社区页（bbs.886.best）且在页面顶部时才允许下拉刷新
-            SWVContext.asw_view.getViewTreeObserver().addOnScrollChangedListener(() -> {
-                String currentUrl = SWVContext.asw_view.getUrl();
-                boolean isForum = currentUrl != null && currentUrl.contains("bbs.886.best");
-                pullRefresh.setEnabled(isForum && SWVContext.asw_view.getScrollY() == 0);
-            });
+            if (!singleWebViewMode) {
+                if (webChat != null) {
+                    webChat.getViewTreeObserver().addOnScrollChangedListener(this::updatePullRefreshState);
+                }
+                if (webLearn != null) {
+                    webLearn.getViewTreeObserver().addOnScrollChangedListener(this::updatePullRefreshState);
+                }
+                if (webTransient != null) {
+                    webTransient.getViewTreeObserver().addOnScrollChangedListener(this::updatePullRefreshState);
+                }
+            } else if (activeWebView != null) {
+                activeWebView.getViewTreeObserver().addOnScrollChangedListener(this::updatePullRefreshState);
+            }
+
+            updatePullRefreshState();
         } else {
             pullRefresh.setRefreshing(false);
             pullRefresh.setEnabled(false);
         }
     }
 
-    /**
-     * Sets the app's theme to light or dark and restarts the activity to apply changes.
-     * @param isDarkMode true for dark mode, false for light mode.
-     */
+    private void updatePullRefreshState() {
+        if (pullRefresh == null) return;
+
+        if (!SWVContext.ASWP_PULLFRESH) {
+            pullRefresh.setEnabled(false);
+            return;
+        }
+
+        boolean enabled = activeWebView != null && activeWebView.getScrollY() == 0;
+
+        if (!singleWebViewMode && activeWebView == webLearn) {
+            enabled = false;
+        }
+
+        pullRefresh.setEnabled(enabled);
+    }
+
     private void setAppTheme(boolean isDarkMode) {
         int mode = isDarkMode ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO;
         AppCompatDelegate.setDefaultNightMode(mode);
-        // No need to restart for modern apps, but if UI glitches appear, a restart can be forced.
-        // Forcing a restart:
-        // Intent intent = getIntent();
-        // finish();
-        // startActivity(intent);
     }
 
-    /**
-     * Setup Firebase Cloud Messaging
-     */
     private void setupFirebaseMessaging() {
         fns.fcm_token(new Functions.TokenCallback() {
             @Override
@@ -768,9 +860,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         });
     }
 
-    /**
-     * Handle incoming intents for notifications, shared content, etc.
-     */
     private void handleIncomingIntents() {
         Intent intent = getIntent();
         Log.d(TAG, "Intent: " + intent.toUri(0));
@@ -784,26 +873,21 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } else if (shareImg != null) {
             Log.d(TAG, "Share image intent: " + shareImg);
             Toast.makeText(this, shareImg, Toast.LENGTH_LONG).show();
-            fns.aswm_view(SWVContext.ASWV_URL, false, SWVContext.asw_error_counter, this);
+            openChatTab();
         } else if (uri != null) {
             Log.d(TAG, "Notification intent: " + uri);
-            fns.aswm_view(uri, false, SWVContext.asw_error_counter, this);
+            routeUrlToTab(uri, true);
         } else if (intent.getData() != null) {
             String path = intent.getDataString();
-            fns.aswm_view(path, false, SWVContext.asw_error_counter, this);
+            routeUrlToTab(path, true);
         } else {
-            Log.d(TAG, "Main intent: " + SWVContext.ASWV_URL);
-            fns.aswm_view(SWVContext.ASWV_URL, false, SWVContext.asw_error_counter, this);
+            openChatTab();
         }
     }
 
-    /**
-     * Handle shared text content
-     */
     private void handleSharedText(String share) {
         Log.d(TAG, "Share text intent: " + share);
 
-        // Extract URL from shared text
         Matcher matcher = Functions.url_pattern().matcher(share);
         String urlStr = "";
 
@@ -814,13 +898,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         }
 
-        // Create sharing URL
         String redirectUrl = SWVContext.ASWV_SHARE_URL +
-                "?text=" + share +
-                "&link=" + urlStr +
-                "&image_url=";
+            "?text=" + share +
+            "&link=" + urlStr +
+            "&image_url=";
 
-        fns.aswm_view(redirectUrl, false, SWVContext.asw_error_counter, this);
+        routeUrlToTab(redirectUrl, true);
     }
 
     public class WebAppInterface {
@@ -842,25 +925,23 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    // Standard activity lifecycle methods
     @Override
     public void onPause() {
         super.onPause();
-        CookieManager.getInstance().flush(); // Flush cookies to persistent storage
-        SWVContext.asw_view.onPause();
+        CookieManager.getInstance().flush();
+        if (activeWebView != null) activeWebView.onPause();
         SWVContext.getPluginManager().onPause();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        SWVContext.asw_view.onResume();
+        if (activeWebView != null) activeWebView.onResume();
         SWVContext.getPluginManager().onResume();
 
-        // Update recent apps appearance
         Bitmap bm = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
         ActivityManager.TaskDescription taskDesc = new ActivityManager.TaskDescription(
-                getString(R.string.app_name), bm, getColor(R.color.colorPrimary));
+            getString(R.string.app_name), bm, getColor(R.color.colorPrimary));
         setTaskDescription(taskDesc);
     }
 
@@ -885,58 +966,38 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onConfigurationChanged(newConfig);
         String theme = (newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES ? "dark" : "light";
         String script = "if(typeof setTheme === 'function') { setTheme('" + theme + "', true); }";
-        if (SWVContext.asw_view != null) {
-            SWVContext.asw_view.evaluateJavascript(script, null);
+        if (activeWebView != null) {
+            activeWebView.evaluateJavascript(script, null);
         }
     }
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        SWVContext.asw_view.saveState(outState);
-        if (SWVContext.asw_view.getUrl() != null) {
-            outState.putString("swv_last_url", SWVContext.asw_view.getUrl());
+        if (activeWebView != null) {
+            activeWebView.saveState(outState);
+            if (activeWebView.getUrl() != null) {
+                outState.putString("swv_last_url", activeWebView.getUrl());
+            }
         }
     }
 
     @Override
     protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
-        SWVContext.asw_view.restoreState(savedInstanceState);
+        if (activeWebView != null) {
+            activeWebView.restoreState(savedInstanceState);
+        }
     }
 
-    /**
-     * Handle back button press
-     */
     @Override
     public boolean onKeyDown(int keyCode, @NonNull KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_BACK) {
-            if (SWVContext.ASWP_EXIT_ON_BACK) {
-                if (SWVContext.ASWP_EXITDIAL) {
-                    fns.ask_exit(this);
-                } else {
-                    finish();
-                }
-                return true;
-            }
-
-            if (SWVContext.asw_view.canGoBack()) {
-                SWVContext.asw_view.goBack();
-            } else {
-                if (SWVContext.ASWP_EXITDIAL) {
-                    fns.ask_exit(this);
-                } else {
-                    finish();
-                }
-            }
-            return true;
+            return handleBackAction();
         }
         return super.onKeyDown(keyCode, event);
     }
 
-    /**
-     * Handle permission request results
-     */
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -948,8 +1009,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 if (permissions[i].equals(Manifest.permission.ACCESS_FINE_LOCATION)) {
                     if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
                         Log.d(TAG, "Location permission granted.");
-                        // We can now safely get the location
-
                     } else {
                         Log.w(TAG, "Location permission denied.");
                     }
@@ -957,17 +1016,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
                         Log.d(TAG, "Notification permission granted.");
 
-                        // Send a test notification under debug mode
-                        if(SWVContext.SWV_DEBUGMODE) {
+                        if (SWVContext.SWV_DEBUGMODE) {
                             Firebase firebase = new Firebase();
                             firebase.sendMyNotification(
-                                    "Yay! Firebase is working",
-                                    "This is a test notification in action.",
-                                    "OPEN_URI",
-                                    SWVContext.ASWV_URL,
-                                    null,
-                                    String.valueOf(SWVContext.ASWV_FCM_ID),
-                                    getApplicationContext());
+                                "Yay! Firebase is working",
+                                "This is a test notification in action.",
+                                "OPEN_URI",
+                                SWVContext.ASWV_URL,
+                                null,
+                                String.valueOf(SWVContext.ASWV_FCM_ID),
+                                getApplicationContext());
                         }
                     } else {
                         Log.w(TAG, "Notification permission denied.");
@@ -977,51 +1035,56 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    /**
-     * WebView client implementation
-     */
     private class WebViewCallback extends WebViewClient {
-    public class WebAppInterface {
+        @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            super.onPageStarted(view, url, favicon);
+            SWVContext.getPluginManager().onPageStarted(url);
+        }
 
-    @JavascriptInterface
-    public void setNativeTheme(String theme) {
-        // 保留原本主题切换逻辑
-        runOnUiThread(() -> {
-            int newMode;
-            if ("dark".equals(theme)) {
-                newMode = AppCompatDelegate.MODE_NIGHT_YES;
-            } else if ("light".equals(theme)) {
-                newMode = AppCompatDelegate.MODE_NIGHT_NO;
-            } else {
-                newMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
-            }
-            if (AppCompatDelegate.getDefaultNightMode() != newMode) {
-                AppCompatDelegate.setDefaultNightMode(newMode);
-            }
-        });
-    }
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
 
-    // --- 这是真正实现 0秒无白屏秒切 的核心秘方 ---
-    @JavascriptInterface
-    public void switchTab(String tabName) {
-        runOnUiThread(() -> {
-            // 1. 隐藏所有 WebView
-            if (SWVContext.webStudy != null) SWVContext.webStudy.setVisibility(View.GONE);
-            if (SWVContext.webForum != null) SWVContext.webForum.setVisibility(View.GONE);
-            if (SWVContext.webMsg != null) SWVContext.webMsg.setVisibility(View.GONE);
+            SWVContext.getPluginManager().onPageFinished(url);
 
-            // 2. 根据前端传来的 tabName 秒切显示
-            if ("study".equals(tabName) && SWVContext.webStudy != null) {
-                SWVContext.webStudy.setVisibility(View.VISIBLE);
-            } else if ("msg".equals(tabName) && SWVContext.webMsg != null) {
-                SWVContext.webMsg.setVisibility(View.VISIBLE);
-            } else if (SWVContext.webForum != null) {
-                // forum, recent, community 等等共用主论坛 WebView
-                SWVContext.webForum.setVisibility(View.VISIBLE);
+            View welcome = findViewById(R.id.msw_welcome);
+            if (welcome != null) {
+                welcome.setVisibility(View.GONE);
             }
-        });
-    }
-    }
+            view.setVisibility(View.VISIBLE);
+            isPageLoaded = true;
+            updatePullRefreshState();
+
+            if (!url.startsWith("file://") && SWVContext.ASWV_GTAG != null && !SWVContext.ASWV_GTAG.isEmpty()) {
+                fns.inject_gtag(view, SWVContext.ASWV_GTAG);
+            }
+
+            String theme = SWVContext.ASWP_DARK_MODE ? "dark" : "light";
+            String script = "if(typeof applyInitialTheme === 'function') { applyInitialTheme('" + theme + "'); }";
+            view.evaluateJavascript(script, null);
+
+            if (SWVContext.ASWP_CUSTOM_CSS) {
+                try {
+                    InputStream inputStream = getAssets().open("web/custom.css");
+                    byte[] buffer = new byte[inputStream.available()];
+                    inputStream.read(buffer);
+                    inputStream.close();
+                    String encoded = Base64.encodeToString(buffer, Base64.NO_WRAP);
+                    String js = "javascript:(function() {" +
+                        "var parent = document.getElementsByTagName('head').item(0);" +
+                        "var style = document.createElement('style');" +
+                        "style.type = 'text/css';" +
+                        "style.innerHTML = window.atob('" + encoded + "');" +
+                        "parent.appendChild(style)" +
+                        "})()";
+                    view.loadUrl(js);
+                    Log.d(TAG, "Custom CSS injected.");
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to inject custom CSS.", e);
+                }
+            }
+        }
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -1031,49 +1094,28 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 return true;
             }
 
-            // 【定制修改】限制内部路由逻辑：保护你的 886.best，把外部广告引流清理干净
-            if (url.startsWith("http://") || url.startsWith("https://")) {
-                if (url.contains("886.best")) {
-                    SWVContext.CURR_URL = url;
-                    // 交给原始的 WebView 路由引擎去处理（它不会打开外部浏览器）
-                } else {
-                    // 非内部链接，强制打开手机自带的浏览器（如 Chrome 或 Safari）
-                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                    startActivity(browserIntent);
-                    return true;
-                }
-            } else if (url.startsWith("file://")) {
+            if (url.matches("^(https?|file)://.*$")) {
                 SWVContext.CURR_URL = url;
             }
-
             return fns.url_actions(view, url, MainActivity.this);
         }
 
         @Override
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-            // This method is called when a page load fails.
-            // We will ignore errors for non-main frame resources (like images or CSS).
             if (request.isForMainFrame()) {
-                // Check if the error is a network-related issue.
-                // A list of common network error codes for Android WebView.
                 int errorCode = error.getErrorCode();
                 if (errorCode == ERROR_HOST_LOOKUP ||
-                        errorCode == ERROR_TIMEOUT ||
-                        errorCode == ERROR_CONNECT ||
-                        errorCode == ERROR_UNKNOWN ||
-                        errorCode == ERROR_IO) {
+                    errorCode == ERROR_TIMEOUT ||
+                    errorCode == ERROR_CONNECT ||
+                    errorCode == ERROR_UNKNOWN ||
+                    errorCode == ERROR_IO) {
 
                     Log.e(TAG, "Network Error Occurred: " + error.getDescription());
 
-                    // Redirect to the custom offline URL.
-                    // It's important to use post() to avoid issues with modifying the WebView
-                    // while it's in the middle of a callback.
                     view.post(() -> {
-                        // First, try to load the primary offline page
                         if (SWVContext.ASWV_OFFLINE_URL != null && !SWVContext.ASWV_OFFLINE_URL.isEmpty()) {
                             view.loadUrl(SWVContext.ASWV_OFFLINE_URL);
                         } else {
-                            // As a final fallback, load the basic error page
                             view.loadUrl("file:///android_asset/error.html");
                         }
                     });
@@ -1091,7 +1133,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 handler.proceed();
                 if (SWVContext.SWV_DEBUGMODE) {
                     Toast.makeText(MainActivity.this, "SSL Error: " + error.getPrimaryError(),
-                            Toast.LENGTH_SHORT).show();
+                        Toast.LENGTH_SHORT).show();
                 }
             }
         }
@@ -1102,7 +1144,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             super.onReceivedHttpError(view, request, errorResponse);
             if (SWVContext.SWV_DEBUGMODE) {
                 Log.e(TAG, "HTTP Error loading " + request.getUrl().toString() +
-                        ": " + errorResponse.getStatusCode());
+                    ": " + errorResponse.getStatusCode());
             }
         }
     }

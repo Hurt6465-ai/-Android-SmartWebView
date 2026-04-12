@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/nav_chat"
+        android:title="会话"
+        android:icon="@drawable/ic_chat" />
+
+    <item
+        android:id="@+id/nav_partner"
+        android:title="语伴"
+        android:icon="@drawable/ic_partner" />
+
+    <item
+        android:id="@+id/nav_community"
+        android:title="社区"
+        android:icon="@drawable/ic_community" />
+
+    <item
+        android:id="@+id/nav_feed"
+        android:title="动态"
+        android:icon="@drawable/ic_feed" />
+
+    <item
+        android:id="@+id/nav_learn"
+        android:title="学习"
+        android:icon="@drawable/ic_learn" />
+
+</menu>

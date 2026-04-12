@@ -4,26 +4,26 @@
     <item
         android:id="@+id/nav_chat"
         android:title="会话"
-        android:icon="@drawable/ic_chat" />
+        android:icon="@android:drawable/ic_dialog_email" />
 
     <item
         android:id="@+id/nav_partner"
         android:title="语伴"
-        android:icon="@drawable/ic_partner" />
+        android:icon="@android:drawable/ic_menu_mylocation" />
 
     <item
         android:id="@+id/nav_community"
         android:title="社区"
-        android:icon="@drawable/ic_community" />
+        android:icon="@android:drawable/ic_menu_sort_by_size" />
 
     <item
         android:id="@+id/nav_feed"
         android:title="动态"
-        android:icon="@drawable/ic_feed" />
+        android:icon="@android:drawable/ic_menu_agenda" />
 
     <item
         android:id="@+id/nav_learn"
         android:title="学习"
-        android:icon="@drawable/ic_learn" />
+        android:icon="@android:drawable/ic_menu_info_details" />
 
 </menu>

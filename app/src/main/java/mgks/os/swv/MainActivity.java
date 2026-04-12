@@ -75,14 +75,10 @@ import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.SearchView;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.app.ActivityCompat;
-import androidx.core.graphics.Insets;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.GravityCompat;
-import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
@@ -154,7 +150,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         });
 
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        // 先交给系统自己处理状态栏/导航栏内边距，避免聊天页顶部额外留白
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
 
         super.onCreate(savedInstanceState);
 
@@ -264,12 +261,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (SWVContext.SWV_DEBUGMODE) {
             Log.d(TAG, "URL: " + SWVContext.CURR_URL + " DEVICE INFO: " + Arrays.toString(fns.get_info(this)));
         }
-
-        ViewCompat.setOnApplyWindowInsetsListener(content, (v, windowInsets) -> {
-            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-            return windowInsets;
-        });
     }
 
     public void setWindowSecure(boolean secure) {
@@ -524,6 +515,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         activeWebView = target;
         SWVContext.asw_view = target;
         updatePullRefreshState();
+        updateBottomNavVisibility(activeWebView.getUrl());
     }
 
     private void openChatTab() {
@@ -533,11 +525,18 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         showOnly(webChat);
-        if (!chatLoaded || webChat.getUrl() == null) {
+        CookieManager.getInstance().flush();
+
+        String currentUrl = webChat.getUrl();
+        if (!chatLoaded) {
             webChat.loadUrl(URL_CHAT);
             chatLoaded = true;
+        } else if (currentUrl == null || currentUrl.equals(URL_CHAT) || !isResolvedUserChatUrl(currentUrl)) {
+            webChat.loadUrl(URL_CHAT);
         }
+
         setBottomChecked(R.id.nav_chat);
+        updateBottomNavVisibility(URL_CHAT);
     }
 
     private void openLearnTab() {
@@ -552,6 +551,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             learnLoaded = true;
         }
         setBottomChecked(R.id.nav_learn);
+        updateBottomNavVisibility(URL_LEARN);
     }
 
     private void openTransientTab(String url, boolean forceReload) {
@@ -573,6 +573,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } else if (isFeedUrl(url)) {
             setBottomChecked(R.id.nav_feed);
         }
+
+        updateBottomNavVisibility(url);
     }
 
     private void setBottomChecked(int itemId) {
@@ -583,8 +585,18 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
+    private boolean isChatEntryUrl(String url) {
+        return url != null && url.equals(URL_CHAT);
+    }
+
+    private boolean isResolvedUserChatUrl(String url) {
+        return url != null && url.matches("^https://bbs\\.886\\.best/user/[^/]+/chats/?$");
+    }
+
     private boolean isChatUrl(String url) {
-        return url != null && url.startsWith("https://bbs.886.best/chats");
+        return isChatEntryUrl(url)
+            || isResolvedUserChatUrl(url)
+            || (url != null && url.matches("^https://bbs\\.886\\.best/user/[^/]+/chats/.+$"));
     }
 
     private boolean isPartnerUrl(String url) {
@@ -601,6 +613,33 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private boolean isLearnUrl(String url) {
         return url != null && url.startsWith("https://886.best");
+    }
+
+    private boolean shouldShowBottomNav(String url) {
+        if (url == null) return false;
+
+        Uri uri = Uri.parse(url);
+        String host = uri.getHost();
+        String path = uri.getPath() == null ? "" : uri.getPath();
+
+        if ("bbs.886.best".equals(host)) {
+            return path.equals("/chats")
+                || path.matches("^/user/[^/]+/chats/?$")
+                || path.equals("/partners")
+                || path.equals("/categories")
+                || path.startsWith("/category/6");
+        }
+
+        if ("886.best".equals(host)) {
+            return path.equals("/") || path.isEmpty();
+        }
+
+        return false;
+    }
+
+    private void updateBottomNavVisibility(String url) {
+        if (bottomNav == null) return;
+        bottomNav.setVisibility(shouldShowBottomNav(url) ? View.VISIBLE : View.GONE);
     }
 
     private void routeUrlToTab(String url, boolean forceReload) {
@@ -621,6 +660,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
             chatLoaded = true;
             setBottomChecked(R.id.nav_chat);
+            updateBottomNavVisibility(url);
         } else if (isLearnUrl(url)) {
             showOnly(webLearn);
             if (forceReload || webLearn.getUrl() == null || !webLearn.getUrl().equals(url)) {
@@ -628,6 +668,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
             learnLoaded = true;
             setBottomChecked(R.id.nav_learn);
+            updateBottomNavVisibility(url);
         } else {
             openTransientTab(url, forceReload);
         }
@@ -1054,7 +1095,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
             view.setVisibility(View.VISIBLE);
             isPageLoaded = true;
-            updatePullRefreshState();
+
+            if (view == activeWebView) {
+                updatePullRefreshState();
+                updateBottomNavVisibility(url);
+            }
 
             if (!url.startsWith("file://") && SWVContext.ASWV_GTAG != null && !SWVContext.ASWV_GTAG.isEmpty()) {
                 fns.inject_gtag(view, SWVContext.ASWV_GTAG);

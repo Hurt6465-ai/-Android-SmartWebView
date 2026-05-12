@@ -1,60 +1,41 @@
 name: Build Android APK
 
-# 触发机制：代码推送到 master 分支时触发，或手动触发
 on:
   push:
-    branches: ["master"] # 如果你的主分支是 main，请改为 main
-  workflow_dispatch:      # 允许在 GitHub Actions 页面手动点击运行
+    branches: ["master", "main"]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build APK Task
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 拉取源代码
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-            # 2. 配置 Java 环境 (改用更通用的版本，并强制清理缓存)
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu' # 换成 zulu，兼容性通常比 temurin 更好
-          java-version: '17'
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
 
-      # 3. 设置 Android SDK (保持不变)
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 4. 赋予执行权限
       - name: Grant Execute Permission
         run: chmod +x gradlew
 
-            # 5. 清理并构建 (加入 clean 步骤非常关键)
       - name: Build Debug APK
-        run: ./gradlew clean assembleDebug --no-daemon --stacktrace --info
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-
-
-      # 6. 构建 Release 版本 APK (生成的通常是 unsigned 未签名版)
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
-
-      # 7. 整理并上传 APK 产物
-      - name: Upload APK Artifacts
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-build-outputs
-          # 自动寻找所有生成的 apk 文件，兼容不同的项目结构
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
-          retention-days: 7 # 构建结果保留 7 天，过期自动清理
-
-      # 8. 终端打印状态
-      - name: Success Message
-        run: echo "🎉 APK 构建完成！请在 GitHub Actions 顶部的 Artifacts 栏目下载。"
+          name: android-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7

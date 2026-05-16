@@ -35,7 +35,7 @@ jobs:
         working-directory: ./docmd
         run: |
           npm install
-          npm install -g @mgks/docmd
+          npm install -g @docmd/core
           docmd build
 
       # --- 2. Merge Sites into One Folder ---
@@ -58,7 +58,7 @@ jobs:
         uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./_final_build # Upload the merged folder
 
